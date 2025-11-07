@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Home,
+  AlertCircle,
+  Compass,
+  AlertTriangle,
   Phone,
   Video,
   Camera,
@@ -27,12 +30,10 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   Navigation,
   Moon,
   Zap,
   Battery,
-  Map,
   Music,
   X,
   Volume2,
@@ -251,14 +252,7 @@ function App() {
           >
             <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-start">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center">
-                  <svg
-                    viewBox="0 0 342 35"
-                    className="w-8 h-8 lg:w-10 lg:h-10 fill-current"
-                  >
-                    <path d="M0 .1a9.7 9.7 0 007 7h11l.5.1v27.6h6.8V7.3L26 7h11a9.8 9.8 0 007-7H0zm238.6 0h-6.8v34.8H263a9.7 9.7 0 006-6.8h-30.3V0zm-52.3 6.8c3.6-1 6.6-3.8 7.4-6.9l-38.1.1v20.6h31.1v7.2h-24.4a13.6 13.6 0 00-8.7 7h39.9v-21h-31.2v-7h24zm116.2 28h6.7v-14h24.6v14h6.7v-21h-38zM85.3 7h26a9.6 9.6 0 007.1-7H78.3a9.6 9.6 0 007 7zm0 13.8h26a9.6 9.6 0 007.1-7H78.3a9.6 9.6 0 007 7zm0 14.1h26a9.6 9.6 0 007.1-7H78.3a9.6 9.6 0 007 7zM308.5 7h26a9.6 9.6 0 007-7h-40a9.6 9.6 0 007 7z" />
-                  </svg>
-                </div>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center"></div>
                 <h1 className="text-xl lg:text-2xl font-semibold">Dashboard</h1>
               </div>
 
@@ -362,13 +356,38 @@ function App() {
                   </button>
                 </div>
               </div>
-
               {/* Control Center */}
               <div
-                className={`rounded-2xl p-4 lg:p-6 ${
-                  isDark ? "bg-gray-900" : "bg-white shadow-lg"
-                }`}
+                className={`rounded-2xl p-4 lg:p-6 ${isDark ? "bg-gray-900" : "bg-white shadow-lg"}`}
               >
+                {/* Alert Banner */}
+                <div className="mb-4 lg:mb-6">
+                  <div
+                    className={`p-3 rounded-lg ${isDark ? "bg-red-900/20 border border-red-800" : "bg-red-50 border border-red-200"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                        <span
+                          className={`font-semibold ${isDark ? "text-red-400" : "text-red-600"}`}
+                        >
+                          Safety Alerts Active
+                        </span>
+                      </div>
+                      <span
+                        className={`text-xs ${isDark ? "text-red-400" : "text-red-500"}`}
+                      >
+                        {new Date().toLocaleDateString("en-US", {
+                          month: "2-digit",
+                          day: "2-digit",
+                          year: "2-digit",
+                        })}
+                        , {new Date().toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
                   {/* Sidebar Navigation */}
                   <div className="flex lg:flex-col gap-3 justify-center">
@@ -501,6 +520,173 @@ function App() {
                         <div className="text-5xl font-bold">{speed}</div>
                         <div className="text-sm text-gray-500 mt-2">km/h</div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Alert Panel */}
+                  <div
+                    className={`w-full lg:w-64 rounded-xl p-4 ${isDark ? "bg-gray-800" : "bg-gray-50"}`}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                      <h3
+                        className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}
+                      >
+                        Active Alerts
+                      </h3>
+                      <span
+                        className={`ml-auto px-2 py-1 rounded-full text-xs font-medium ${
+                          isDark
+                            ? "bg-red-900/50 text-red-300"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        4
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Driver Distracted Alert */}
+                      <div
+                        className={`flex items-start gap-3 p-3 rounded-lg ${
+                          isDark
+                            ? "bg-red-900/20 border border-red-800"
+                            : "bg-red-50 border border-red-200"
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
+                            >
+                              DRIVER DISTRACTED
+                            </span>
+                            <span
+                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
+                            >
+                              Now
+                            </span>
+                          </div>
+                          <p
+                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                          >
+                            Driver attention diverted from road
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Driver Drowsy Alert */}
+                      <div
+                        className={`flex items-start gap-3 p-3 rounded-lg ${
+                          isDark
+                            ? "bg-red-900/20 border border-red-800"
+                            : "bg-red-50 border border-red-200"
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
+                            >
+                              DRIVER DROWSY
+                            </span>
+                            <span
+                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
+                            >
+                              2 min ago
+                            </span>
+                          </div>
+                          <p
+                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                          >
+                            Signs of fatigue detected
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Phone Usage Alert */}
+                      <div
+                        className={`flex items-start gap-3 p-3 rounded-lg ${
+                          isDark
+                            ? "bg-red-900/20 border border-red-800"
+                            : "bg-red-50 border border-red-200"
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
+                            >
+                              DRIVER CHECKING PHONE
+                            </span>
+                            <span
+                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
+                            >
+                              5 min ago
+                            </span>
+                          </div>
+                          <p
+                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                          >
+                            Mobile device usage while driving
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Rash Driving Alert */}
+                      <div
+                        className={`flex items-start gap-3 p-3 rounded-lg ${
+                          isDark
+                            ? "bg-red-900/20 border border-red-800"
+                            : "bg-red-50 border border-red-200"
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
+                            >
+                              RASH DRIVING
+                            </span>
+                            <span
+                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
+                            >
+                              8 min ago
+                            </span>
+                          </div>
+                          <p
+                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                          >
+                            Aggressive maneuvers detected
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alert Actions */}
+                    <div className="flex gap-2 mt-4 pt-4 border-t border-gray-700">
+                      <button
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                          isDark
+                            ? "bg-gray-700 hover:bg-gray-600 text-white"
+                            : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                        }`}
+                      >
+                        Acknowledge
+                      </button>
+                      <button
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                          isDark
+                            ? "bg-red-600 hover:bg-red-700 text-white"
+                            : "bg-red-500 hover:bg-red-600 text-white"
+                        }`}
+                      >
+                        Emergency
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -725,58 +911,157 @@ function App() {
                   </div>
                 )}
               </div>
-
-              {/* Google Maps */}
+              {/* Google Maps - Interactive Version */}
               <div
                 className={`rounded-2xl p-4 lg:p-6 ${
                   isDark ? "bg-gray-900" : "bg-white shadow-lg"
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Google Maps</h3>
-                  <button
-                    onClick={openGoogleMaps}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      isDark
-                        ? "bg-lime-400 text-black hover:bg-lime-500"
-                        : "bg-lime-400 text-black hover:bg-lime-500"
-                    }`}
-                  >
-                    Open Map
-                  </button>
+                  <h3 className="text-lg font-semibold">Navigation</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={openGoogleMaps}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        isDark
+                          ? "bg-lime-400 text-black hover:bg-lime-500"
+                          : "bg-lime-400 text-black hover:bg-lime-500"
+                      }`}
+                    >
+                      Open Map
+                    </button>
+                  </div>
                 </div>
+
+                {/* Interactive Map Container */}
                 <div
-                  className={`rounded-xl p-4 h-48 relative overflow-hidden ${
+                  className={`rounded-xl h-48 relative overflow-hidden ${
                     isDark ? "bg-gray-800" : "bg-gray-100"
                   }`}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Map className="w-12 h-12 text-gray-500" />
-                  </div>
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <div className="bg-black bg-opacity-70 rounded-lg p-3">
-                      <div className="font-semibold text-sm">
-                        Rolling Green Rd.
-                      </div>
-                      <div className="text-xs text-gray-300">
-                        2716 Ash Dr. San Jose, South Dakota
+                  {/* MapTiler Interactive Map */}
+                  <iframe
+                    src="https://api.maptiler.com/maps/streets-v2/?key=iaxsZ27HgyxS3qWBqoaq#10.5/18.5204/73.8567"
+                    className="w-full h-full border-0"
+                    title="Pune Interactive Map"
+                    loading="lazy"
+                  />
+
+                  {/* Overlay Elements */}
+
+                  {/* Location Info Overlay */}
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <div
+                      className={`rounded-lg p-3 backdrop-blur-sm border ${
+                        isDark
+                          ? "bg-black bg-opacity-50 border-gray-700"
+                          : "bg-white bg-opacity-90 border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div
+                            className={`font-semibold text-sm ${
+                              isDark ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            FC Road, Pune
+                          </div>
+                          <div
+                            className={`text-xs ${
+                              isDark ? "text-gray-300" : "text-gray-600"
+                            }`}
+                          >
+                            Heading to Koregaon Park
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              isDark
+                                ? "bg-green-900 text-green-300"
+                                : "bg-green-100 text-green-700"
+                            }`}
+                          >
+                            Moving
+                          </div>
+                          <Navigation className="w-4 h-4 text-lime-400" />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>4 km</span>
+
+                {/* Rest of the navigation details remains the same */}
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
                     <div
-                      className={`h-0.5 flex-1 mx-2 rounded ${
-                        isDark ? "bg-gray-700" : "bg-gray-300"
+                      className={`p-2 rounded-lg ${
+                        isDark ? "bg-gray-800" : "bg-gray-100"
                       }`}
-                    />
-                    <span>6 min</span>
+                    >
+                      <div className="text-xs text-gray-500">Distance</div>
+                      <div className="font-semibold text-sm">4.2 km</div>
+                    </div>
+                    <div
+                      className={`p-2 rounded-lg ${
+                        isDark ? "bg-gray-800" : "bg-gray-100"
+                      }`}
+                    >
+                      <div className="text-xs text-gray-500">Time</div>
+                      <div className="font-semibold text-sm">12 min</div>
+                    </div>
+                    <div
+                      className={`p-2 rounded-lg ${
+                        isDark ? "bg-gray-800" : "bg-gray-100"
+                      }`}
+                    >
+                      <div className="text-xs text-gray-500">Arrival</div>
+                      <div className="font-semibold text-sm">6:24 PM</div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`p-3 rounded-lg flex items-center gap-3 ${
+                      isDark
+                        ? "bg-blue-900/20 border border-blue-800"
+                        : "bg-blue-50 border border-blue-200"
+                    }`}
+                  >
+                    <ArrowRight className="w-5 h-5 text-blue-500" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">
+                        In 500m, turn right
+                      </div>
+                      <div className="text-xs text-gray-500">SB Road</div>
+                    </div>
+                    <div className="text-xs font-medium text-blue-500">
+                      0.5 km
+                    </div>
                   </div>
                 </div>
-              </div>
 
+                <div className="flex gap-2 mt-4">
+                  <button
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      isDark
+                        ? "bg-gray-800 hover:bg-gray-700 text-white"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      isDark
+                        ? "bg-lime-600 hover:bg-lime-700 text-white"
+                        : "bg-lime-500 hover:bg-lime-600 text-white"
+                    }`}
+                  >
+                    Re-route
+                  </button>
+                </div>
+              </div>
               {/* Phone Controls */}
               <div
                 className={`rounded-2xl p-4 lg:p-6 ${
