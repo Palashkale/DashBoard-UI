@@ -38,6 +38,9 @@ import {
   X,
   Volume2,
   Wifi,
+  Eye,
+  EyeOff,
+  User,
 } from "lucide-react";
 
 function App() {
@@ -53,6 +56,162 @@ function App() {
   const [isCelsius, setIsCelsius] = useState(true);
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
+
+  // Backend API state
+  const [detectionStatus, setDetectionStatus] = useState({
+    active: false,
+    status: "INACTIVE",
+    probability: 0.0,
+    alert: false,
+    features: {
+      ear_left: 0.0,
+      ear_right: 0.0,
+      mar: 0.0,
+      pitch: 0.0,
+      yaw: 0.0,
+      roll: 0.0,
+    },
+    stats: {
+      total_frames_processed: 0,
+      distraction_events: 0,
+      alerts_triggered: 0,
+      face_detection_rate: 0.0,
+    },
+  });
+
+  const [apiConnected, setApiConnected] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const eventSourceRef = useRef(null);
+
+  const API_BASE_URL = "http://localhost:5000/api";
+
+  // Connect to backend API
+  useEffect(() => {
+    checkApiHealth();
+    setupEventSource();
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
+
+  const checkApiHealth = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      const data = await response.json();
+      setApiConnected(data.status === "healthy");
+
+      // Get initial status
+      const statusResponse = await fetch(`${API_BASE_URL}/status`);
+      const statusData = await statusResponse.json();
+      setDetectionStatus(statusData);
+    } catch (error) {
+      console.error("API connection failed:", error);
+      setApiConnected(false);
+    }
+  };
+
+  const setupEventSource = () => {
+    try {
+      eventSourceRef.current = new EventSource(`${API_BASE_URL}/live`);
+
+      eventSourceRef.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setDetectionStatus((prev) => ({
+          ...prev,
+          ...data,
+        }));
+
+        // Add alert if new distraction detected
+        if (data.alert && data.status === "DISTRACTED") {
+          const newAlert = {
+            id: Date.now(),
+            type: "DRIVER_DISTRACTED",
+            message: "Driver attention diverted from road",
+            probability: data.probability,
+            timestamp: new Date().toLocaleTimeString(),
+            active: true,
+          };
+
+          setAlerts((prev) => [newAlert, ...prev.slice(0, 9)]); // Keep last 10 alerts
+
+          // Auto-remove alert after 10 seconds
+          setTimeout(() => {
+            setAlerts((prev) =>
+              prev.filter((alert) => alert.id !== newAlert.id),
+            );
+          }, 10000);
+        }
+      };
+
+      eventSourceRef.current.onerror = (error) => {
+        console.error("EventSource error:", error);
+        setApiConnected(false);
+      };
+    } catch (error) {
+      console.error("Failed to setup EventSource:", error);
+    }
+  };
+
+  // Control detection system
+  const startDetection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDetectionStatus((prev) => ({
+          ...prev,
+          active: true,
+          status: "ACTIVE",
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to start detection:", error);
+    }
+  };
+
+  const stopDetection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDetectionStatus((prev) => ({
+          ...prev,
+          active: false,
+          status: "INACTIVE",
+        }));
+        setAlerts([]);
+      }
+    } catch (error) {
+      console.error("Failed to stop detection:", error);
+    }
+  };
+
+  const resetStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.ok) {
+        setAlerts([]);
+        // Refresh status
+        const statusResponse = await fetch(`${API_BASE_URL}/status`);
+        const statusData = await statusResponse.json();
+        setDetectionStatus(statusData);
+      }
+    } catch (error) {
+      console.error("Failed to reset stats:", error);
+    }
+  };
 
   // Camera functionality
   const toggleCamera = async () => {
@@ -129,6 +288,54 @@ function App() {
   const toggleTemperatureUnit = () => {
     setIsCelsius(!isCelsius);
   };
+
+  // Acknowledge alert
+  const acknowledgeAlert = (alertId) => {
+    setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+  };
+
+  // Get status color and icon
+  const getStatusInfo = () => {
+    switch (detectionStatus.status) {
+      case "DISTRACTED":
+        return {
+          color: "text-red-400",
+          bgColor: "bg-red-500",
+          icon: AlertTriangle,
+          label: "DISTRACTED",
+        };
+      case "NORMAL":
+        return {
+          color: "text-green-400",
+          bgColor: "bg-green-500",
+          icon: Eye,
+          label: "ATTENTIVE",
+        };
+      case "NO_FACE":
+        return {
+          color: "text-yellow-400",
+          bgColor: "bg-yellow-500",
+          icon: User,
+          label: "NO FACE",
+        };
+      case "INACTIVE":
+        return {
+          color: "text-gray-400",
+          bgColor: "bg-gray-500",
+          icon: EyeOff,
+          label: "INACTIVE",
+        };
+      default:
+        return {
+          color: "text-blue-400",
+          bgColor: "bg-blue-500",
+          icon: Eye,
+          label: "MONITORING",
+        };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
 
   // Settings options
   const settingsOptions = [
@@ -252,8 +459,27 @@ function App() {
           >
             <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-start">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center"></div>
-                <h1 className="text-xl lg:text-2xl font-semibold">Dashboard</h1>
+                <div className="w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center">
+                  <div
+                    className={`w-8 h-8 rounded-full ${statusInfo.bgColor} flex items-center justify-center`}
+                  >
+                    <statusInfo.icon className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-xl lg:text-2xl font-semibold">
+                    Driver Monitoring System
+                  </h1>
+                  <div
+                    className={`text-xs ${statusInfo.color} flex items-center gap-1`}
+                  >
+                    <span>Status: {statusInfo.label}</span>
+                    <span>•</span>
+                    <span>
+                      API: {apiConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="lg:hidden flex items-center gap-4">
@@ -320,28 +546,34 @@ function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Left Column */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Emergency Card */}
+              {/* Detection Control Card */}
               <div
                 className={`rounded-2xl p-5 ${
                   isDark ? "bg-gray-900" : "bg-white shadow-lg"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
-                      <div className="w-3 h-3 bg-white rounded-full" />
+                    <div
+                      className={`w-10 h-10 ${statusInfo.bgColor} rounded-full flex items-center justify-center`}
+                    >
+                      <statusInfo.icon className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <div className="font-semibold">Emergency</div>
+                      <div className="font-semibold">Driver Monitoring</div>
                       <div className="text-xs text-gray-500">
-                        Switch on only in emergency case
+                        {detectionStatus.active
+                          ? "Active - Monitoring driver attention"
+                          : "System inactive"}
                       </div>
                     </div>
                   </div>
                   <button
-                    onClick={() => setEmergencyMode(!emergencyMode)}
+                    onClick={
+                      detectionStatus.active ? stopDetection : startDetection
+                    }
                     className={`relative w-14 h-7 rounded-full transition-colors ${
-                      emergencyMode
+                      detectionStatus.active
                         ? "bg-lime-400"
                         : isDark
                           ? "bg-gray-700"
@@ -350,12 +582,120 @@ function App() {
                   >
                     <div
                       className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                        emergencyMode ? "translate-x-7" : ""
+                        detectionStatus.active ? "translate-x-7" : ""
                       }`}
                     />
                   </button>
                 </div>
+
+                {/* Detection Stats */}
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div
+                    className={`text-center p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="text-2xl font-bold text-lime-400">
+                      {detectionStatus.stats.alerts_triggered}
+                    </div>
+                    <div className="text-xs text-gray-500">Alerts</div>
+                  </div>
+                  <div
+                    className={`text-center p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="text-2xl font-bold text-blue-400">
+                      {(
+                        detectionStatus.stats.face_detection_rate * 100
+                      ).toFixed(1)}
+                      %
+                    </div>
+                    <div className="text-xs text-gray-500">Face Detection</div>
+                  </div>
+                  <div
+                    className={`text-center p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="text-2xl font-bold text-purple-400">
+                      {detectionStatus.probability.toFixed(3)}
+                    </div>
+                    <div className="text-xs text-gray-500">Probability</div>
+                  </div>
+                </div>
+
+                {/* Feature Metrics */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div
+                    className={`p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-500">Left EAR</span>
+                      <span className="text-xs font-bold">
+                        {detectionStatus.features.ear_left.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-cyan-400 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(detectionStatus.features.ear_left * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    className={`p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-500">Right EAR</span>
+                      <span className="text-xs font-bold">
+                        {detectionStatus.features.ear_right.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-cyan-400 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(detectionStatus.features.ear_right * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    className={`p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-500">MAR</span>
+                      <span className="text-xs font-bold">
+                        {detectionStatus.features.mar.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(detectionStatus.features.mar * 50, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    className={`p-3 rounded-lg ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-500">Head Pose</span>
+                      <span className="text-xs font-bold">
+                        {Math.abs(detectionStatus.features.yaw).toFixed(1)}°
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min((Math.abs(detectionStatus.features.yaw) / 90) * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
+
               {/* Control Center */}
               <div
                 className={`rounded-2xl p-4 lg:p-6 ${isDark ? "bg-gray-900" : "bg-white shadow-lg"}`}
@@ -363,26 +703,28 @@ function App() {
                 {/* Alert Banner */}
                 <div className="mb-4 lg:mb-6">
                   <div
-                    className={`p-3 rounded-lg ${isDark ? "bg-red-900/20 border border-red-800" : "bg-red-50 border border-red-200"}`}
+                    className={`p-3 rounded-lg ${detectionStatus.alert ? "bg-red-900/20 border border-red-800" : isDark ? "bg-green-900/20 border border-green-800" : "bg-green-50 border border-green-200"}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                        {detectionStatus.alert ? (
+                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <Eye className="w-5 h-5 text-green-500" />
+                        )}
                         <span
-                          className={`font-semibold ${isDark ? "text-red-400" : "text-red-600"}`}
+                          className={`font-semibold ${detectionStatus.alert ? (isDark ? "text-red-400" : "text-red-600") : isDark ? "text-green-400" : "text-green-600"}`}
                         >
-                          Safety Alerts Active
+                          {detectionStatus.alert
+                            ? "DRIVER DISTRACTION DETECTED!"
+                            : "Driver Attention Normal"}
                         </span>
                       </div>
                       <span
-                        className={`text-xs ${isDark ? "text-red-400" : "text-red-500"}`}
+                        className={`text-xs ${detectionStatus.alert ? (isDark ? "text-red-400" : "text-red-500") : isDark ? "text-green-400" : "text-green-500"}`}
                       >
-                        {new Date().toLocaleDateString("en-US", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          year: "2-digit",
-                        })}
-                        , {new Date().toLocaleTimeString()}
+                        Probability:{" "}
+                        {(detectionStatus.probability * 100).toFixed(1)}%
                       </span>
                     </div>
                   </div>
@@ -541,151 +883,89 @@ function App() {
                             : "bg-red-100 text-red-700"
                         }`}
                       >
-                        4
+                        {alerts.length}
                       </span>
                     </div>
 
-                    <div className="space-y-3">
-                      {/* Driver Distracted Alert */}
-                      <div
-                        className={`flex items-start gap-3 p-3 rounded-lg ${
-                          isDark
-                            ? "bg-red-900/20 border border-red-800"
-                            : "bg-red-50 border border-red-200"
-                        }`}
-                      >
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
-                            >
-                              DRIVER DISTRACTED
-                            </span>
-                            <span
-                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
-                            >
-                              Now
-                            </span>
-                          </div>
-                          <p
-                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
-                          >
-                            Driver attention diverted from road
-                          </p>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {alerts.length === 0 ? (
+                        <div
+                          className={`text-center py-4 ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          <Eye className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <div className="text-sm">No active alerts</div>
                         </div>
-                      </div>
-
-                      {/* Driver Drowsy Alert */}
-                      <div
-                        className={`flex items-start gap-3 p-3 rounded-lg ${
-                          isDark
-                            ? "bg-red-900/20 border border-red-800"
-                            : "bg-red-50 border border-red-200"
-                        }`}
-                      >
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
-                            >
-                              DRIVER DROWSY
-                            </span>
-                            <span
-                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
-                            >
-                              2 min ago
-                            </span>
-                          </div>
-                          <p
-                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                      ) : (
+                        alerts.map((alert) => (
+                          <div
+                            key={alert.id}
+                            className={`flex items-start gap-3 p-3 rounded-lg ${
+                              isDark
+                                ? "bg-red-900/20 border border-red-800"
+                                : "bg-red-50 border border-red-200"
+                            }`}
                           >
-                            Signs of fatigue detected
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Phone Usage Alert */}
-                      <div
-                        className={`flex items-start gap-3 p-3 rounded-lg ${
-                          isDark
-                            ? "bg-red-900/20 border border-red-800"
-                            : "bg-red-50 border border-red-200"
-                        }`}
-                      >
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
-                            >
-                              DRIVER CHECKING PHONE
-                            </span>
-                            <span
-                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
-                            >
-                              5 min ago
-                            </span>
+                            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <span
+                                  className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
+                                >
+                                  {alert.type}
+                                </span>
+                                <span
+                                  className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
+                                >
+                                  {alert.timestamp}
+                                </span>
+                              </div>
+                              <p
+                                className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
+                              >
+                                {alert.message}
+                              </p>
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-xs text-gray-500">
+                                  Prob: {(alert.probability * 100).toFixed(1)}%
+                                </span>
+                                <button
+                                  onClick={() => acknowledgeAlert(alert.id)}
+                                  className="text-xs text-lime-400 hover:text-lime-300"
+                                >
+                                  Acknowledge
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <p
-                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
-                          >
-                            Mobile device usage while driving
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Rash Driving Alert */}
-                      <div
-                        className={`flex items-start gap-3 p-3 rounded-lg ${
-                          isDark
-                            ? "bg-red-900/20 border border-red-800"
-                            : "bg-red-50 border border-red-200"
-                        }`}
-                      >
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`font-medium ${isDark ? "text-red-400" : "text-red-700"}`}
-                            >
-                              RASH DRIVING
-                            </span>
-                            <span
-                              className={`text-xs ${isDark ? "text-red-400" : "text-red-600"}`}
-                            >
-                              8 min ago
-                            </span>
-                          </div>
-                          <p
-                            className={`text-xs mt-1 ${isDark ? "text-red-300" : "text-red-600"}`}
-                          >
-                            Aggressive maneuvers detected
-                          </p>
-                        </div>
-                      </div>
+                        ))
+                      )}
                     </div>
 
                     {/* Alert Actions */}
                     <div className="flex gap-2 mt-4 pt-4 border-t border-gray-700">
                       <button
+                        onClick={resetStats}
                         className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                           isDark
                             ? "bg-gray-700 hover:bg-gray-600 text-white"
                             : "bg-gray-200 hover:bg-gray-300 text-gray-800"
                         }`}
                       >
-                        Acknowledge
+                        Reset Stats
                       </button>
                       <button
+                        onClick={
+                          detectionStatus.active
+                            ? stopDetection
+                            : startDetection
+                        }
                         className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                          isDark
+                          detectionStatus.active
                             ? "bg-red-600 hover:bg-red-700 text-white"
-                            : "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-lime-600 hover:bg-lime-700 text-white"
                         }`}
                       >
-                        Emergency
+                        {detectionStatus.active ? "Stop" : "Start"} Detection
                       </button>
                     </div>
                   </div>
@@ -708,19 +988,23 @@ function App() {
                           cx="40"
                           cy="40"
                           r="32"
-                          stroke="#a3e635"
+                          stroke={apiConnected ? "#a3e635" : "#ef4444"}
                           strokeWidth="6"
                           fill="none"
-                          strokeDasharray="125 200"
+                          strokeDasharray={apiConnected ? "200 200" : "50 200"}
                           strokeLinecap="round"
                         />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <Zap className="w-4 h-4 mb-1" />
-                        <div className="text-sm font-bold">62%</div>
+                        <Cloud className="w-4 h-4 mb-1" />
+                        <div
+                          className={`text-sm font-bold ${apiConnected ? "text-lime-400" : "text-red-400"}`}
+                        >
+                          {apiConnected ? "ON" : "OFF"}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">Power</div>
+                    <div className="text-xs text-gray-500">API</div>
                   </div>
 
                   <div className="flex flex-col items-center gap-2">
